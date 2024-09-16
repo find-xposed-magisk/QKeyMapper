@@ -1,6 +1,4 @@
 # QKeyMapper
-[按键映射工具] QKeyMapper, developed with Qt for Windows 10 &amp; Windows 11, is a tool that allows for key mapping without modifying the registry or requiring a system restart. It takes effect and can be stopped immediately. | QKeyMapper，Qt开发Win10&amp;Win11可用，不修改注册表、不需重新启动系统，可立即生效和停止，新增虚拟游戏手柄功能，可鼠标控制虚拟手柄摇杆。
-# QKeyMapper
 
 <p align="left">
     <a href="./LICENSE"><img src="https://img.shields.io/github/license/Zalafina/QKeyMapper"></a>
@@ -34,8 +32,16 @@
 
 ---------------
 ### 新添加功能列表(根据更新时间降序排列)
-* v1.3.7(Build 20240810)
+* v1.3.7(Build 20240916)
+    * 单个设定选择项(进程名+标题)下支持添加多套映射表，默认的映射表标签名是"Tab1"，鼠标左键双击"+"标签页按钮添加一个空白映射表，标签页名称自动按照数字排序"Tab2"、"Tab3"……
+    * 鼠标左键双击已存在的映射表标签名位置进入"映射表设定"对话框，可以对"映射表名"和"映射表快捷键"进行修改，修改后需要点击"更新"按钮生效。更新后的"映射表名"和"映射表快捷键"需要点击"保存设定"按钮才会保存到设定文件中。
+    * "映射表快捷键"用于在游戏中映射生效状态下通过快捷键切换当前激活的映射表，这样游戏中可以随时切换几套不同按键映射。如果快捷键前面加入"$"字符，表示快捷键设置的按键键触发之后不会被拦截，仍然会发送给应用程序。
+    * "映射表设定"对话框窗口添加"导出映射表"按钮，可以导出某一个映射表中的全部按键映射数据到INI文件中，默认导出文件名是"mapdatatable.ini"，可在文件保存对话框中自己设置文件名。
+    * "映射表设定"对话框窗口添加"导入映射表"按钮，可以选择INI文件来导入之前导出的映射表数据文件，数据导入后追加到所选映射表的末尾。由于同一映射表中不能存在相同按键的重复映射，如果导入的数据的原始按键与表中已存在数据的原始按键相同会被过滤掉。
+    * 物理手柄按键检测输入检测可以检测到虚拟手柄输入，可以将虚拟手柄按键映射和物理手柄按键映射组合来使用。例如：可以同时添加 vJoy-Mouse2RS 和 Joy-RS-Up、Joy-RS-Down、Joy-RS-Left、Joy-RS-Right 映射到键盘按键，达到鼠标向上下左右移动触发键盘按键的效果。
+* v1.3.7(Build 20240812)
     * 原始按键列表中"Joy-"开头的物理手柄按键可以添加"@" + "0到9" 的数字编号来选择输入手柄的玩家编号(PlayerIndex)来进行区分映射，可支持0到9总共10个玩家编号。不添加"@" + "0到9" 的数字编号则映射来自所有物理手柄的输入。
+    * 添加"游戏手柄"下拉组合框用于配合"原始按键"列表选择原始按键映射的游戏手柄玩家编号(PlayerIndex)，根据所选择的游戏手柄玩家编号(PlayerIndex)在添加"Joy-"开头的原始按键映射时候在后面追加"@+数字编号0~9"，例如："Joy-Key1(A/×)@0"表示0号游戏手柄的(A/×)按键。
     * 移除功能 [鼠标点击高亮选择一条映射表项目后，按下键盘"Backspace"键可以删除最后一个"»"或"+"连接的映射按键]，映射按键可以通过映射项设定窗口中的"映射按键"编辑框进行修改。
 * v1.3.7(Build 20240711)
     * "映射按键列表"添加SendText映射，选择SendText后在"文本"单行编辑框中输入文字可以在按下原始按键时向当前前台窗口或指定窗口发送SendText()括号内的字符串。
@@ -174,7 +180,7 @@
 ---------------
 ## Screenshot
 ![Screenshot](https://raw.githubusercontent.com/Zalafina/QKeyMapper/master/screenshot/QKeyMapper_screenshot_02.png)
-![Removemappingkey](https://raw.githubusercontent.com/Zalafina/QKeyMapper/master/screenshot/remove_last_mappingkey.gif)
+![Screenshot](https://raw.githubusercontent.com/Zalafina/QKeyMapper/master/screenshot/QKeyMapper_screenshot_03.png)
 ---------------
 ## VirScan result
 ![Screenshot](https://raw.githubusercontent.com/Zalafina/QKeyMapper/master/screenshot/QKeyMapper_VirScan.png)
