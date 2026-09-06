@@ -47,3 +47,5 @@
 - [Bitmask No-Fallback in LowLevel Hook](bitmask-no-fallback-lowlevel-hook.md) — 设备编号未知时 bitmask 不应回退为 mask!=0；只有全局 bool 控制屏蔽
 - [Qt Compat Header Transitive Include](qt-compat-header-transitive-include.md) — qkeymapper_qt_compat.h 通过 qkeymapper.h 间接包含，多数文件无需手动 include
 - [QStringList(int) Qt5 Compat Fix](episodic/2026-07-24-qstringlist-int-constructor-qt5-compat.json) — Qt5.12 QStringList(int) 构造函数不兼容修复：添加 makeQStringList helper
+- [Global Windows Hook Startup Lifecycle Guard](hook-startup-lifecycle-guard.md) — 全局 Windows 钩子子线程与主 GUI 窗口启动时序竞争空指针崩溃的生命周期原子守卫与透明透传模式
+
