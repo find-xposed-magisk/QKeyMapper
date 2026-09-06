@@ -14903,6 +14903,10 @@ bool QKeyMapper::nativeEvent(const QByteArray &eventType, void *message, long *r
 {
     if (eventType == "windows_generic_MSG") {
         MSG* msg = static_cast<MSG*>(message);
+        if (!msg) {
+            return false;
+        }
+
         if (msg->message == WM_WTSSESSION_CHANGE) {
             if (msg->wParam == WTS_SESSION_LOCK) {
 #ifdef DEBUG_LOGOUT_ON
@@ -14985,6 +14989,17 @@ bool QKeyMapper::nativeEvent(const QByteArray &eventType, void *message, long *r
                     }
                 }
             }
+        }
+        else if (msg->message == WM_QUERYENDSESSION || msg->message == WM_ENDSESSION) {
+#ifdef DEBUG_LOGOUT_ON
+            qDebug().nospace() << "[QKeyMapper::nativeEvent] "
+                               << (msg->message == WM_QUERYENDSESSION ? "WM_QUERYENDSESSION" : "WM_ENDSESSION")
+                               << " detected (wParam=0x" << QString::number((quintptr)msg->wParam, 16)
+                               << ", lParam=0x" << QString::number((quintptr)msg->lParam, 16) << "). "
+                               << "Restoring system FilterKeys baseline before shutdown...";
+#endif
+            restoreSystemFilterKeysBaseline();
+            clearSystemFilterKeysSession();
         }
     }
 
