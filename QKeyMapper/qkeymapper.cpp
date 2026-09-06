@@ -3001,6 +3001,8 @@ QKeyMapper::QKeyMapper(QWidget *parent) :
 #endif
     ui->setupUi(this);
 
+    initProcessInfoTable();
+
 #ifdef USE_CUSTOMSTYLE
     m_CustomSpinBoxStyle = new CustomSpinBoxStyle(QApplication::style());
 #endif
@@ -3228,8 +3230,6 @@ QKeyMapper::QKeyMapper(QWidget *parent) :
     //ui->showNotesButton->setChecked(false);
     //ui->hideDisabledButton->setChecked(false);
     //ui->showFloatingButton->setChecked(false);
-
-    initProcessInfoTable();
     // ui->processCheckBox->setFocusPolicy(Qt::NoFocus);
     // ui->titleCheckBox->setFocusPolicy(Qt::NoFocus);
     ui->settingNameLineEdit->setFocusPolicy(Qt::ClickFocus);
@@ -31432,6 +31432,10 @@ void QKeyMapper::updateSysTrayIconMenuText()
 
 void QKeyMapper::resizeProcessInfoTableColumnWidth()
 {
+    if (!ui || !ui->processinfoTable || ui->processinfoTable->columnCount() < PROCESSINFO_TABLE_COLUMN_COUNT) {
+        return;
+    }
+
     ui->processinfoTable->horizontalHeader()->setStretchLastSection(false);
 
     int referenceWidth = ui->processinfoTable->width();
@@ -32866,6 +32870,10 @@ void QKeyMapper::updateKeyMappingDataTableConnection()
 
 void QKeyMapper::resizeKeyMappingDataTableColumnWidth(KeyMappingDataTableWidget *mappingDataTable)
 {
+    if (!mappingDataTable || mappingDataTable->columnCount() <= 0) {
+        return;
+    }
+
     mappingDataTable->horizontalHeader()->setStretchLastSection(false);
 
     int referenceWidth = mappingDataTable->width();
