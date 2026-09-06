@@ -81,6 +81,7 @@ CONFIG(debug, debug|release){
 }
 
 CONFIG(release, debug|release){
+    CONFIG += force_debug_info
     !contains(DEFINES, LOGOUT_TOFILE) {
         DEFINES += QT_NO_DEBUG_OUTPUT
         DEFINES += QT_NO_INFO_OUTPUT
