@@ -391,6 +391,14 @@ void setupQtScaleEnvironment(const QString &program_dir)
     else {
         QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     }
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+    if (high_dpi) {
+        QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Ceil);
+    }
+    else {
+        QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+    }
 #else
     Q_UNUSED(high_dpi);
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
