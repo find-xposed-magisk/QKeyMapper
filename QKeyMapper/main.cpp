@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QDir>
 #include "qkeymapper.h"
+#include <dbghelp.h>
 #include "qkeymapper_worker.h"
 #include "interception_worker.h"
 #ifdef SINGLE_APPLICATION
@@ -417,8 +418,79 @@ static bool IsProcessRunAsAdmin()
     return (isRunAsAdmin != FALSE);
 }
 
+static LONG WINAPI QKeyMapperUnhandledExceptionFilter(EXCEPTION_POINTERS *pExceptionInfo)
+{
+    WCHAR dumpPath[MAX_PATH] = { 0 };
+    WCHAR exePath[MAX_PATH] = { 0 };
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+    WCHAR *lastSlash = wcsrchr(exePath, L'\\');
+    if (lastSlash) {
+        *lastSlash = L'\0';
+    }
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+
+    WCHAR logDir[MAX_PATH] = { 0 };
+    swprintf_s(logDir, MAX_PATH, L"%s\\log", exePath);
+    CreateDirectoryW(logDir, NULL);
+
+    swprintf_s(dumpPath, MAX_PATH, L"%s\\QKeyMapper_Crash_%04d%02d%02d_%02d%02d%02d_%03d.dmp",
+               logDir, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    HANDLE hDumpFile = CreateFileW(dumpPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hDumpFile != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
+        dumpInfo.ThreadId = GetCurrentThreadId();
+        dumpInfo.ExceptionPointers = pExceptionInfo;
+        dumpInfo.ClientPointers = FALSE;
+
+        MiniDumpWriteDump(
+            GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hDumpFile,
+            MiniDumpNormal,
+            &dumpInfo,
+            NULL,
+            NULL
+        );
+        CloseHandle(hDumpFile);
+    }
+
+    DWORD exceptionCode = (pExceptionInfo && pExceptionInfo->ExceptionRecord) ? pExceptionInfo->ExceptionRecord->ExceptionCode : 0;
+    PVOID exceptionAddress = (pExceptionInfo && pExceptionInfo->ExceptionRecord) ? pExceptionInfo->ExceptionRecord->ExceptionAddress : NULL;
+
+    char crashLogMsg[1024] = { 0 };
+    sprintf_s(crashLogMsg, sizeof(crashLogMsg),
+              "\r\n==================== [FATAL CRASH DETECTED] ====================\r\n"
+              "Time: %04d-%02d-%02d %02d:%02d:%02d.%03d\r\n"
+              "ExceptionCode: 0x%08lX\r\n"
+              "ExceptionAddress: 0x%p\r\n"
+              "MiniDump File: %ls\r\n"
+              "=================================================================\r\n",
+              st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+              (unsigned long)exceptionCode, exceptionAddress, dumpPath);
+
+    WCHAR activeLogPath[MAX_PATH] = { 0 };
+    swprintf_s(activeLogPath, MAX_PATH, L"%s\\QKeyMapper.log", logDir);
+    HANDLE hLogFile = CreateFileW(activeLogPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hLogFile != INVALID_HANDLE_VALUE) {
+        DWORD bytesWritten = 0;
+        WriteFile(hLogFile, crashLogMsg, (DWORD)strlen(crashLogMsg), &bytesWritten, NULL);
+        CloseHandle(hLogFile);
+    }
+
+    fprintf(stderr, "%s\n", crashLogMsg);
+    fflush(stderr);
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 int main(int argc, char *argv[])
 {
+    SetUnhandledExceptionFilter(QKeyMapperUnhandledExceptionFilter);
+
     if (!IsProcessRunAsAdmin()) {
         // Priority 1: Read LanguageIndex from keymapdata.ini (user's saved preference)
         int languageIndex = -1;

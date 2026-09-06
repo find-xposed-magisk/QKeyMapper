@@ -2981,11 +2981,23 @@ QKeyMapper::QKeyMapper(QWidget *parent) :
 #endif
 
     initBlankIconForComboBox();
+#ifdef DEBUG_LOGOUT_ON
+    qDebug() << "[QKeyMapper()] Initializing GDI+...";
+#endif
     InitializeGDIPlus();
+#ifdef DEBUG_LOGOUT_ON
+    qDebug() << "[QKeyMapper()] Creating transparent window...";
+#endif
     m_TransParentHandle = createTransparentWindow();
+#ifdef DEBUG_LOGOUT_ON
+    qDebug() << "[QKeyMapper()] Creating crosshair window...";
+#endif
     m_CrosshairHandle = createCrosshairWindow();
 
     m_instance = this;
+#ifdef DEBUG_LOGOUT_ON
+    qDebug() << "[QKeyMapper()] Calling setupUi...";
+#endif
     ui->setupUi(this);
 
 #ifdef USE_CUSTOMSTYLE
@@ -2995,9 +3007,12 @@ QKeyMapper::QKeyMapper(QWidget *parent) :
     // Explicitly create the native MainWindow HWND at startup.
     // This ensures that even if the application is minimized to system tray at startup,
     // and show() is never called, winId() will still return a valid HWND handle.
+#ifdef DEBUG_LOGOUT_ON
+    qDebug() << "[QKeyMapper()] Calling createWinId()...";
+#endif
     createWinId();
 #ifdef DEBUG_LOGOUT_ON
-    qDebug() << "[QKeyMapper()]" << "Mainwindow HWND ID ->" << reinterpret_cast<HWND>(winId());
+    qDebug() << "[QKeyMapper()] Mainwindow HWND ID ->" << reinterpret_cast<HWND>(winId());
 #endif
 
 #ifdef DEBUG_LOGOUT_ON
@@ -10793,7 +10808,6 @@ LRESULT QKeyMapper::MousePointsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
     //     return 1;
     // }
     case WM_DESTROY:
-        PostQuitMessage(0);
         break;
     default:
         return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -11070,7 +11084,6 @@ LRESULT QKeyMapper::CrosshairWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
     //     return 1;
     // }
     case WM_DESTROY:
-        PostQuitMessage(0);
         break;
     default:
         return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -14844,6 +14857,44 @@ QIcon QKeyMapper::loadSettingCustomIcon(QString &iconpath)
     return icon_loaded;
 }
 
+static bool safeReadWideString(LPARAM lParam, wchar_t *outBuf, size_t maxChars)
+{
+    if (!lParam || (ULONG_PTR)lParam < 0x10000) {
+        return false;
+    }
+    __try {
+        const wchar_t *src = reinterpret_cast<const wchar_t*>(lParam);
+        size_t i = 0;
+        for (; i < maxChars - 1 && src[i] != L'\0'; ++i) {
+            outBuf[i] = src[i];
+        }
+        outBuf[i] = L'\0';
+        return (i > 0);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+static bool safeReadAnsiString(LPARAM lParam, char *outBuf, size_t maxChars)
+{
+    if (!lParam || (ULONG_PTR)lParam < 0x10000) {
+        return false;
+    }
+    __try {
+        const char *src = reinterpret_cast<const char*>(lParam);
+        size_t i = 0;
+        for (; i < maxChars - 1 && src[i] != '\0'; ++i) {
+            outBuf[i] = src[i];
+        }
+        outBuf[i] = '\0';
+        return (i > 0);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 bool QKeyMapper::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
 #else
@@ -14866,6 +14917,10 @@ bool QKeyMapper::nativeEvent(const QByteArray &eventType, void *message, long *r
             }
         }
         else if (msg->message == WM_SETTINGCHANGE) {
+#ifdef DEBUG_LOGOUT_ON
+            qDebug(" \033[1;35m[QKeyMapper::nativeEvent] WM_SETTINGCHANGE: wParam=0x%08llX, lParam=0x%016llX\033[0m",
+                   (unsigned long long)msg->wParam, (unsigned long long)msg->lParam);
+#endif
             if (msg->wParam == SPI_SETFILTERKEYS) {
 #ifdef DEBUG_LOGOUT_ON
                 qDebug() << "[QKeyMapper::nativeEvent]" << "Filter Keys settings changed";
@@ -14873,31 +14928,32 @@ bool QKeyMapper::nativeEvent(const QByteArray &eventType, void *message, long *r
                 emit systemFilterKeysSettingChanged_Signal();
             }
 
-            if (msg->lParam) {
-                // Try reading as wide-char string
-                QString param = QString::fromWCharArray(reinterpret_cast<const wchar_t*>(msg->lParam));
+            wchar_t wideBuffer[256] = {0};
+            char ansiBuffer[256] = {0};
+            QString param;
 
-                // If failed (empty) and Windows might have sent ANSI string
-                if (param.isEmpty()) {
-                    param = QString::fromLocal8Bit(reinterpret_cast<const char*>(msg->lParam));
-                }
-
-#ifdef DEBUG_LOGOUT_ON
-                qDebug() << "[QKeyMapper::nativeEvent]" << "WM_SETTINGCHANGE ->" << param;
-#endif
-
-                if (param == QStringLiteral("ImmersiveColorSet")) {
-#ifdef DEBUG_LOGOUT_ON
-                    qDebug() << "[QKeyMapper::nativeEvent]" << "ImmersiveColorSet Theme Changed";
-#endif
-                    emit systemThemeChanged_Signal();
-                }
+            if (safeReadWideString(msg->lParam, wideBuffer, sizeof(wideBuffer) / sizeof(wchar_t))) {
+                param = QString::fromWCharArray(wideBuffer);
+            } else if (safeReadAnsiString(msg->lParam, ansiBuffer, sizeof(ansiBuffer))) {
+                param = QString::fromLocal8Bit(ansiBuffer);
             }
-            else {
+
 #ifdef DEBUG_LOGOUT_ON
-                qDebug() << "[QKeyMapper::nativeEvent]" << "WM_SETTINGCHANGE -> (NULL lParam), wParam =" << msg->wParam;
+            if (!param.isEmpty()) {
+                qDebug() << "[QKeyMapper::nativeEvent] WM_SETTINGCHANGE param string ->" << param;
+            } else if (msg->lParam != 0) {
+                qDebug(" \033[1;33m[QKeyMapper::nativeEvent] WM_SETTINGCHANGE lParam is numeric/non-string: 0x%016llX\033[0m",
+                       (unsigned long long)msg->lParam);
+            } else {
+                qDebug() << "[QKeyMapper::nativeEvent] WM_SETTINGCHANGE lParam is NULL";
+            }
 #endif
 
+            if (param == QStringLiteral("ImmersiveColorSet")) {
+#ifdef DEBUG_LOGOUT_ON
+                qDebug() << "[QKeyMapper::nativeEvent]" << "ImmersiveColorSet Theme Changed";
+#endif
+                emit systemThemeChanged_Signal();
             }
         }
         else if (msg->message == WM_ERASEBKGND
