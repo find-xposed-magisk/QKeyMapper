@@ -6,6 +6,7 @@
 #include "qstyle_singletons.h"
 
 #include <algorithm>
+#include <vector>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
@@ -6424,22 +6425,23 @@ BOOL QKeyMapper::EnumWindowsProc(HWND hWnd, LPARAM lParam)
         return TRUE;
     }
 
-    QString WindowText;
-    QString processName;
-    QString ProcessPath;
-    QString filename;
-    QString className;
+    try {
+        QString WindowText;
+        QString processName;
+        QString ProcessPath;
+        QString filename;
+        QString className;
 
-    // Optimize GetWindowText call by checking window text length first
-    int titleLength = GetWindowTextLength(hWnd);
-    if (titleLength > 0) {
-        // Allocate buffer with exact size needed instead of fixed MAX_PATH
-        std::wstring titleString(titleLength, L'\0');
-        int resultLength = GetWindowTextW(hWnd, &titleString[0], titleLength + 1);
-        if (resultLength > 0) {
-            WindowText = QString::fromStdWString(titleString);
+        // Optimize GetWindowText call by checking window text length first
+        int titleLength = GetWindowTextLength(hWnd);
+        if (titleLength > 0) {
+            // Allocate buffer with exact size needed plus null terminator
+            std::vector<wchar_t> titleBuffer(titleLength + 1, L'\0');
+            int resultLength = GetWindowTextW(hWnd, titleBuffer.data(), static_cast<int>(titleBuffer.size()));
+            if (resultLength > 0) {
+                WindowText = QString::fromWCharArray(titleBuffer.data(), resultLength);
+            }
         }
-    }
 
     if (tid != 0 && dwProcessId != 0 ) {
         getProcessInfoFromPID(dwProcessId, ProcessPath);
@@ -6522,11 +6524,16 @@ BOOL QKeyMapper::EnumWindowsProc(HWND hWnd, LPARAM lParam)
             if (fileicon.isNull()) {
                 HICON iconptr = (HICON)(LONG_PTR)GetClassLongPtr(hWnd, GCLP_HICON);
                 if (iconptr != Q_NULLPTR){
+                    ICONINFO iconInfo = {};
+                    if (GetIconInfo(iconptr, &iconInfo)) {
+                        if (iconInfo.hbmColor) DeleteObject(iconInfo.hbmColor);
+                        if (iconInfo.hbmMask) DeleteObject(iconInfo.hbmMask);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-                    fileicon = QIcon(QPixmap::fromImage(QImage::fromHICON(iconptr)));
+                        fileicon = QIcon(QPixmap::fromImage(QImage::fromHICON(iconptr)));
 #else
-                    fileicon = QIcon(QtWin::fromHICON(iconptr));
+                        fileicon = QIcon(QtWin::fromHICON(iconptr));
 #endif
+                    }
                 }
             }
 
@@ -6576,6 +6583,12 @@ BOOL QKeyMapper::EnumWindowsProc(HWND hWnd, LPARAM lParam)
 //        WindowText = QString::fromWCharArray(titleBuffer);
 //        qDebug().nospace().noquote() << "[EnumWindowsProc] " << "(WindowTitle empty)" << WindowText <<" [PID:" << dwProcessId <<"]" << "(" << filename << ")";
 //#endif
+    }
+    }
+    catch (...) {
+#ifdef DEBUG_LOGOUT_ON
+        qWarning() << "[EnumWindowsProc] Exception caught during window enumeration for hwnd:" << hWnd;
+#endif
     }
 
     return TRUE;
@@ -31469,23 +31482,41 @@ void QKeyMapper::resizeProcessInfoTableColumnWidth()
 void QKeyMapper::refreshProcessInfoTable(bool resize)
 {
     bool isSelected = false;
-    QList<QTableWidgetItem*> items = ui->processinfoTable->selectedItems();
     QString selectedProcess;
     QString selectedPID;
     QString selectedTitle;
     QString selectedClassName;
     int selectedColumn = 0;
-    if (!items.empty()) {
-        selectedProcess = items.at(PROCESS_NAME_COLUMN)->text();
-        selectedPID = items.at(PROCESS_PID_COLUMN)->text();
-        selectedTitle = items.at(PROCESS_TITLE_COLUMN)->text();
-        selectedClassName = items.at(PROCESS_CLASS_COLUMN)->text();
-        isSelected = true;
-        QTableWidgetItem *current = ui->processinfoTable->currentItem();
-        selectedColumn = current ? current->column() : 0;
+
+    int currentRow = -1;
+    QTableWidgetItem *current = ui->processinfoTable->currentItem();
+    if (current) {
+        currentRow = current->row();
+        selectedColumn = current->column();
+    } else {
+        QList<QTableWidgetItem*> items = ui->processinfoTable->selectedItems();
+        if (!items.isEmpty() && items.first()) {
+            currentRow = items.first()->row();
+            selectedColumn = items.first()->column();
+        }
+    }
+
+    if (currentRow >= 0 && currentRow < ui->processinfoTable->rowCount()) {
+        QTableWidgetItem *itemProcess = ui->processinfoTable->item(currentRow, PROCESS_NAME_COLUMN);
+        QTableWidgetItem *itemPID = ui->processinfoTable->item(currentRow, PROCESS_PID_COLUMN);
+        QTableWidgetItem *itemTitle = ui->processinfoTable->item(currentRow, PROCESS_TITLE_COLUMN);
+        QTableWidgetItem *itemClass = ui->processinfoTable->item(currentRow, PROCESS_CLASS_COLUMN);
+        if (itemProcess && itemPID && itemTitle && itemClass) {
+            selectedProcess = itemProcess->text();
+            selectedPID = itemPID->text();
+            selectedTitle = itemTitle->text();
+            selectedClassName = itemClass->text();
+            isSelected = true;
 #ifdef DEBUG_LOGOUT_ON
-        qDebug().nospace().noquote() << "[refreshProcessInfoTable]" << "Selected[" << items.size() << "] -> " << selectedProcess << " | " << selectedPID << " | " << selectedTitle << " | " << selectedClassName;
+            qDebug().nospace().noquote() << "[refreshProcessInfoTable]" << "Selected row [" << currentRow << "] -> "
+                                         << selectedProcess << " | " << selectedPID << " | " << selectedTitle << " | " << selectedClassName;
 #endif
+        }
     }
 
     ui->processinfoTable->setRowCount(0);
@@ -31507,10 +31538,15 @@ void QKeyMapper::refreshProcessInfoTable(bool resize)
     if (isSelected) {
         int reselectrow = -1;
         for (int i = 0; i < ui->processinfoTable->rowCount(); ++i) {
-            if (ui->processinfoTable->item(i, PROCESS_NAME_COLUMN)->text() == selectedProcess
-                && ui->processinfoTable->item(i, PROCESS_PID_COLUMN)->text() == selectedPID
-                && ui->processinfoTable->item(i, PROCESS_TITLE_COLUMN)->text() == selectedTitle
-                && ui->processinfoTable->item(i, PROCESS_CLASS_COLUMN)->text() == selectedClassName) {
+            QTableWidgetItem *itemProcess = ui->processinfoTable->item(i, PROCESS_NAME_COLUMN);
+            QTableWidgetItem *itemPID = ui->processinfoTable->item(i, PROCESS_PID_COLUMN);
+            QTableWidgetItem *itemTitle = ui->processinfoTable->item(i, PROCESS_TITLE_COLUMN);
+            QTableWidgetItem *itemClass = ui->processinfoTable->item(i, PROCESS_CLASS_COLUMN);
+            if (itemProcess && itemPID && itemTitle && itemClass
+                && itemProcess->text() == selectedProcess
+                && itemPID->text() == selectedPID
+                && itemTitle->text() == selectedTitle
+                && itemClass->text() == selectedClassName) {
                 reselectrow = i;
                 break;
             }
