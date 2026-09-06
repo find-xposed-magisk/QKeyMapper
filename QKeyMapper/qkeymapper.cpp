@@ -2886,6 +2886,7 @@ QKeyMapper *QKeyMapper::m_instance = Q_NULLPTR;
 QString QKeyMapper::DEFAULT_TITLE = QString("Forza: Horizon 4");
 
 bool QKeyMapper::s_isDestructing = false;
+QAtomicInt QKeyMapper::s_AtomicIsInitialized = 0;
 HWINEVENTHOOK QKeyMapper::s_WinEventHook = Q_NULLPTR;
 int QKeyMapper::s_GlobalSettingAutoStart = 0;
 HWND QKeyMapper::s_CurrentMappingHWND = NULL;
@@ -3848,6 +3849,7 @@ QKeyMapper::QKeyMapper(QWidget *parent) :
     connectSettingDirtySignals();
     clearSaveSettingDirty();
     flushPendingCommonPriorityRepairAfterLoad();
+    QKEYMAPPER_ATOMIC_STORE_RELAXED(s_AtomicIsInitialized, 1);
 }
 QKeyMapper::~QKeyMapper()
 {
@@ -3856,6 +3858,7 @@ QKeyMapper::~QKeyMapper()
 
 #endif
     s_isDestructing = true;
+    QKEYMAPPER_ATOMIC_STORE_RELAXED(s_AtomicIsInitialized, 0);
 
     restoreSystemFilterKeysBaseline();
     clearSystemFilterKeysSession();

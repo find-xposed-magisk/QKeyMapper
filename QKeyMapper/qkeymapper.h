@@ -1152,6 +1152,11 @@ public:
         return m_instance;
     }
 
+    static bool isInitialized()
+    {
+        return (m_instance != Q_NULLPTR) && (QKEYMAPPER_ATOMIC_LOAD_RELAXED(s_AtomicIsInitialized) != 0) && (!s_isDestructing);
+    }
+
     #define QT_KEY_EXTENDED         (0x01000000U)
     #define QT_KEY_L_SHIFT          (0x00000001U)
     #define QT_KEY_L_CTRL           (0x00000002U)
@@ -2201,6 +2206,7 @@ public slots:
 
 public:
     static bool s_isDestructing;
+    static QAtomicInt s_AtomicIsInitialized;
     static HWINEVENTHOOK s_WinEventHook;
     static int s_GlobalSettingAutoStart;
     static HWND s_CurrentMappingHWND;
